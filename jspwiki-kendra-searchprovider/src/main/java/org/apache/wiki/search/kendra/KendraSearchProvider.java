@@ -18,9 +18,9 @@
  */
 package org.apache.wiki.search.kendra;
 
-import com.amazonaws.services.kendra.AWSkendra;
-import com.amazonaws.services.kendra.AWSkendraClientBuilder;
-import com.amazonaws.services.kendra.model.*;
+import software.amazon.awssdk.services.kendra.KendraClient;
+import software.amazon.awssdk.services.kendra.KendraClientBuilder;
+import software.amazon.awssdk.services.kendra.model.*;
 import com.amazonaws.util.IOUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -74,7 +74,7 @@ public class KendraSearchProvider implements SearchProvider {
     private Engine engine;
     private Properties properties;
     private Map< String, Object > contentTypes;
-    private AWSkendra kendra;
+    private KendraClient kendra;
     private String indexName;
     private String indexId;
     private String dataSourceName;
@@ -142,10 +142,10 @@ public class KendraSearchProvider implements SearchProvider {
     @Override
     public void pageRemoved( final Page page ) {
         final String pageName = page.getName();
-        final BatchDeleteDocumentRequest request = new BatchDeleteDocumentRequest().withIndexId( indexId )
-                .withDocumentIdList( pageName );
-        final BatchDeleteDocumentResult result = getKendra().batchDeleteDocument( request );
-        if (result.getFailedDocuments().isEmpty()) {
+        final BatchDeleteDocumentRequest request = BatchDeleteDocumentRequest.builder().indexId( indexId )
+                .documentIdList( pageName ).build();
+        final BatchDeleteDocumentResponse result = getKendra().batchDeleteDocument( request );
+        if (result.failedDocuments().isEmpty()) {
             LOG.debug( format( "Page '%s' was removed from index", pageName ) );
         } else {
             LOG.error( format( "Failed to remove Page '%s' from index", pageName ) );
@@ -168,7 +168,7 @@ public class KendraSearchProvider implements SearchProvider {
      */
     @Override
     public Collection< SearchResult > findPages( final String query, final Context wikiContext ) throws ProviderException, IOException {
-        final QueryRequest request = new QueryRequest().withIndexId( indexId ).withQueryText( query );
+        final QueryRequest request = QueryRequest.builder().indexId( indexId ).queryText( query ).build();
         final List< QueryResultItem > items;
         try {
             items = getKendra().query( request ).getResultItems();
@@ -180,11 +180,11 @@ public class KendraSearchProvider implements SearchProvider {
         final AuthorizationManager mgr = engine.getManager( AuthorizationManager.class );
 
         for ( final QueryResultItem item : items ) {
-            switch( QueryResultType.fromValue( item.getType() ) ) {
+            switch( QueryResultType.fromValue( item.type() ) ) {
                 case DOCUMENT:
-                    final String documentId = item.getDocumentId();
-                    final String documentExcerpt = item.getDocumentExcerpt().getText();
-                    final String scoreConfidence = item.getScoreAttributes().getScoreConfidence();
+                    final String documentId = item.documentId();
+                    final String documentExcerpt = item.documentExcerpt().text();
+                    final String scoreConfidence = item.scoreAttributes().scoreConfidence();
                     final Page page = this.engine.getManager( PageManager.class ).getPage( documentId, PageProvider.LATEST_VERSION );
                     if ( page != null ) {
                         final PagePermission pp = new PagePermission( page, PagePermission.VIEW_ACTION );
@@ -202,7 +202,7 @@ public class KendraSearchProvider implements SearchProvider {
                     }
                     break;
                 default:
-                    LOG.error( format( "Unknown query result type: %s", item.getType() ) );
+                    LOG.error( format( "Unknown query result type: %s", item.type() ) );
             }
         }
         return searchResults;
@@ -234,21 +234,21 @@ public class KendraSearchProvider implements SearchProvider {
      * @return the index id or {@code null}
      */
     private String getIndexId( final String indexName ) {
-        ListIndicesRequest request = new ListIndicesRequest();
-        ListIndicesResult result = getKendra().listIndices( request );
+        ListIndicesRequest request = ListIndicesRequest.builder().build();
+        ListIndicesResponse result = getKendra().listIndices( request );
         String nextToken = "";
         while ( nextToken != null ) {
-            final List< IndexConfigurationSummary > items = result.getIndexConfigurationSummaryItems();
+            final List< IndexConfigurationSummary > items = result.indexConfigurationSummaryItems();
             if ( items == null || items.isEmpty() ) {
                 return null;
             }
             for ( final IndexConfigurationSummary item : items ) {
-                if ( StringUtils.equals( item.getName(), indexName ) ) {
-                    return item.getId();
+                if ( StringUtils.equals( item.name(), indexName ) ) {
+                    return item.id();
                 }
             }
-            nextToken = result.getNextToken();
-            request = new ListIndicesRequest().withNextToken( result.getNextToken() );
+            nextToken = result.nextToken();
+            request = ListIndicesRequest.builder().nextToken( result.nextToken() ).build();
             result = getKendra().listIndices( request );
         }
         return null;
@@ -262,22 +262,22 @@ public class KendraSearchProvider implements SearchProvider {
      * @return the datasource id or {@code null}
      */
     private String getDatasourceId( final String indexId, final String dataSourceName ) {
-        ListDataSourcesRequest request = new ListDataSourcesRequest().withIndexId( indexId );
-        ListDataSourcesResult result = getKendra().listDataSources( request );
+        ListDataSourcesRequest request = ListDataSourcesRequest.builder().indexId( indexId ).build();
+        ListDataSourcesResponse result = getKendra().listDataSources( request );
         String nextToken = "";
         while ( nextToken != null ) {
-            final List< DataSourceSummary > items = result.getSummaryItems();
+            final List< DataSourceSummary > items = result.summaryItems();
             if ( items == null || items.isEmpty() ) {
                 return null;
             }
 
             for ( final DataSourceSummary item : items ) {
-                if ( StringUtils.equals( item.getName(), dataSourceName ) ) {
-                    return item.getId();
+                if ( StringUtils.equals( item.name(), dataSourceName ) ) {
+                    return item.id();
                 }
             }
-            nextToken = result.getNextToken();
-            request = new ListDataSourcesRequest().withNextToken( result.getNextToken() );
+            nextToken = result.nextToken();
+            request = ListDataSourcesRequest.builder().nextToken( result.nextToken() ).build();
             result = getKendra().listDataSources( request );
         }
         return null;
@@ -357,17 +357,17 @@ public class KendraSearchProvider implements SearchProvider {
      * @return The execution id
      */
     private String startExecution() {
-        final StartDataSourceSyncJobRequest request = new StartDataSourceSyncJobRequest().withIndexId( indexId )
-                .withId( dataSourceId );
-        final StartDataSourceSyncJobResult result = getKendra().startDataSourceSyncJob( request );
-        return result.getExecutionId();
+        final StartDataSourceSyncJobRequest request = StartDataSourceSyncJobRequest.builder().indexId( indexId )
+                .id( dataSourceId ).build();
+        final StartDataSourceSyncJobResponse result = getKendra().startDataSourceSyncJob( request );
+        return result.executionId();
     }
 
     /**
      * Stop the execution for the given index Id and DataSource Id.
      */
     private void stopExecution() {
-        final StopDataSourceSyncJobRequest request = new StopDataSourceSyncJobRequest().withIndexId( indexId ).withId( dataSourceId );
+        final StopDataSourceSyncJobRequest request = StopDataSourceSyncJobRequest.builder().indexId( indexId ).id( dataSourceId ).build();
         getKendra().stopDataSourceSyncJob( request );
     }
 
@@ -381,14 +381,14 @@ public class KendraSearchProvider implements SearchProvider {
         final String pageName = page.getName();
         try {
             final Document document = newDocument( page, executionId );
-            final BatchPutDocumentRequest request = new BatchPutDocumentRequest().withIndexId( indexId )
-                    .withDocuments( document );
-            final BatchPutDocumentResult result = getKendra().batchPutDocument( request );
-            if (result.getFailedDocuments().isEmpty()) {
-                LOG.info( format( "Successfully indexed Page '%s' as %s", page.getName(), document.getContentType() ) );
+            final BatchPutDocumentRequest request = BatchPutDocumentRequest.builder().indexId( indexId )
+                    .documents( document ).build();
+            final BatchPutDocumentResponse result = getKendra().batchPutDocument( request );
+            if (result.failedDocuments().isEmpty()) {
+                LOG.info( format( "Successfully indexed Page '%s' as %s", page.getName(), document.contentType() ) );
             } else {
-                for ( final BatchPutDocumentResponseFailedDocument failedDocument : result.getFailedDocuments() ) {
-                    LOG.error( format( "Failed to index Page '%s': %s", failedDocument.getId(), failedDocument.getErrorMessage() ) );
+                for ( final BatchPutDocumentResponseFailedDocument failedDocument : result.failedDocuments() ) {
+                    LOG.error( format( "Failed to index Page '%s': %s", failedDocument.id(), failedDocument.errorMessage() ) );
                 }
             }
         } catch ( final IOException e ) {
@@ -435,12 +435,12 @@ public class KendraSearchProvider implements SearchProvider {
             final String text = engine.getManager( PageManager.class ).getPureText( page );
             blob = ByteBuffer.wrap( text.getBytes( StandardCharsets.UTF_8 ) );
         }
-        return new Document().withId( pageName ).withTitle( title ).withAttributes( attrs ).withBlob( blob )
-                .withContentType( contentType );
+        return Document.builder().id( pageName ).title( title ).attributes( attrs ).blob( blob )
+                .contentType( contentType ).build();
     }
 
     private DocumentAttribute newAttribute( final String key, final String value ) {
-        return new DocumentAttribute().withKey( key ).withValue( new DocumentAttributeValue().withStringValue( value ) );
+        return DocumentAttribute.builder().key( key ).value( DocumentAttributeValue.builder().stringValue( value ).build() ).build();
     }
 
     @SuppressWarnings( "unchecked" )
@@ -519,16 +519,16 @@ public class KendraSearchProvider implements SearchProvider {
         }
     }
 
-    public AWSkendra getKendra() {
+    public KendraClient getKendra() {
         return kendra;
     }
 
-    public void setKendra( final AWSkendra kendra ) {
+    public void setKendra( final KendraClient kendra ) {
         this.kendra = kendra;
     }
 
-    protected AWSkendra buildClient() {
-        return AWSkendraClientBuilder.defaultClient();
+    protected KendraClient buildClient() {
+        return KendraClientBuilder.defaultClient();
     }
 
     public String getIndexName() {

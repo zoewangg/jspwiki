@@ -20,11 +20,11 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
+
+import software.amazon.awssdk.services.kendra.model.ScoreConfidence;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
-
-import com.amazonaws.services.kendra.model.ScoreConfidence;
 
 @Target({ METHOD })
 @Retention(RUNTIME)

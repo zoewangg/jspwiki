@@ -16,8 +16,8 @@
  */
 package org.apache.wiki.search.kendra;
 
-import com.amazonaws.services.kendra.AWSkendra;
-import com.amazonaws.services.kendra.model.*;
+import software.amazon.awssdk.services.kendra.KendraClient;
+import software.amazon.awssdk.services.kendra.model.*;
 import net.sourceforge.stripes.mock.MockHttpServletRequest;
 import org.apache.wiki.TestEngine;
 import org.apache.wiki.api.core.Context;
@@ -52,7 +52,7 @@ public class KendraSearchProviderTest {
     KendraSearchProvider searchProvider;
 
     @Mock
-    AWSkendra kendraMock;
+    KendraClient kendraMock;
 
     @BeforeEach
     void setUp( final TestInfo testInfo ) throws Exception {
@@ -61,7 +61,7 @@ public class KendraSearchProviderTest {
         // before each test I set up the Kendra Client
         searchProvider = new KendraSearchProvider() {
             @Override
-            protected AWSkendra buildClient() {
+            protected KendraClient buildClient() {
                 return kendraMock;
             }
         };
@@ -194,32 +194,32 @@ public class KendraSearchProviderTest {
     private void setUpKendraMock( final String indexName, final String dataSourceName ) {
         final String indexId = UUID.randomUUID().toString();
         final String dataSourceId = UUID.randomUUID().toString();
-        when( kendraMock.listIndices( any( ListIndicesRequest.class ) ) ).then( ( Answer< ListIndicesResult > ) invocation -> {
-            final ListIndicesResult result = new ListIndicesResult();
+        when( kendraMock.listIndices( any( ListIndicesRequest.class ) ) ).then( ( Answer< ListIndicesResponse > ) invocation -> {
+            final ListIndicesResponse result = ListIndicesResponse.builder().build();
             if ( StringUtils.isNotBlank( indexName ) ) {
-                result.withIndexConfigurationSummaryItems( new IndexConfigurationSummary().withId( indexId ).withName( indexName ) );
+                result.indexConfigurationSummaryItems( IndexConfigurationSummary.builder().id( indexId ).name( indexName ).build() );
             }
             return result;
         } );
         lenient().when( kendraMock.listDataSources( any( ListDataSourcesRequest.class ) ) )
-                .then( ( Answer< ListDataSourcesResult > ) invocation -> {
-                    final ListDataSourcesResult result = new ListDataSourcesResult();
+                .then( ( Answer< ListDataSourcesResponse > ) invocation -> {
+                    final ListDataSourcesResponse result = ListDataSourcesResponse.builder().build();
                     if ( StringUtils.isNotBlank( dataSourceName ) ) {
-                        result.withSummaryItems( new DataSourceSummary().withId( dataSourceId ).withName( dataSourceName ) );
+                        result.summaryItems( DataSourceSummary.builder().id( dataSourceId ).name( dataSourceName ).build() );
                     }
                     return result;
                 } );
         lenient().when( kendraMock.startDataSourceSyncJob( any( StartDataSourceSyncJobRequest.class ) ) )
-                .then( ( Answer< StartDataSourceSyncJobResult > ) invocation -> new StartDataSourceSyncJobResult().withExecutionId( "executionId" ) );
+                .then( ( Answer< StartDataSourceSyncJobResponse > ) invocation -> StartDataSourceSyncJobResponse.builder().executionId( "executionId" ).build() );
         lenient().when( kendraMock.batchPutDocument( any( BatchPutDocumentRequest.class ) ) )
-                .then( ( Answer< BatchPutDocumentResult > ) invocation -> {
-                    final BatchPutDocumentResult result = new BatchPutDocumentResult();
-                    result.withFailedDocuments( new ArrayList<>() );
+                .then( ( Answer< BatchPutDocumentResponse > ) invocation -> {
+                    final BatchPutDocumentResponse result = BatchPutDocumentResponse.builder().build();
+                    result.failedDocuments( new ArrayList<>() );
                     return result;
                 } );
-        lenient().when( kendraMock.query( any( QueryRequest.class ) ) ).then( ( Answer< QueryResult > ) invocation -> {
-            final QueryResult result = new QueryResult();
-            result.withResultItems( new ArrayList<>() );
+        lenient().when( kendraMock.query( any( QueryRequest.class ) ) ).then( ( Answer< QueryResponse > ) invocation -> {
+            final QueryResponse result = QueryResponse.builder().build();
+            result.resultItems( new ArrayList<>() );
             return result;
         } );
     }
@@ -239,17 +239,17 @@ public class KendraSearchProviderTest {
     }
 
     private void addResults( final WithResult... withResults ) {
-        when( kendraMock.query( any( QueryRequest.class ) ) ).then( ( Answer< QueryResult > ) invocation -> {
+        when( kendraMock.query( any( QueryRequest.class ) ) ).then( ( Answer< QueryResponse > ) invocation -> {
             final List< QueryResultItem > items = new ArrayList<>();
             for ( final WithResult withResult : withResults ) {
-                final QueryResultItem item = new QueryResultItem().withType( QueryResultType.DOCUMENT );
-                item.withDocumentId( withResult.name() );
-                item.withDocumentTitle( new TextWithHighlights().withText( withResult.name() ) );
-                item.withDocumentExcerpt( new TextWithHighlights().withText( withResult.text() ) );
-                item.withScoreAttributes( new ScoreAttributes().withScoreConfidence( withResult.scoreConfidence() ) );
+                final QueryResultItem item = QueryResultItem.builder().type( QueryResultType.DOCUMENT ).build();
+                item.documentId( withResult.name() );
+                item.documentTitle( TextWithHighlights.builder().text( withResult.name() ).build() );
+                item.documentExcerpt( TextWithHighlights.builder().text( withResult.text() ).build() );
+                item.scoreAttributes( ScoreAttributes.builder().scoreConfidence( withResult.scoreConfidence() ).build() );
                 items.add( item );
             }
-            return new QueryResult().withResultItems( items );
+            return QueryResponse.builder().resultItems( items ).build();
         } );
     }
 }
