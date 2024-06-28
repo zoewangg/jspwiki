@@ -148,9 +148,9 @@
     <dependencies>       <!-- ordered alphabetically by scope:groupId:artifactId                                     -->
       <!-- compile dependencies -->
       <dependency>
-        <groupId>com.amazonaws</groupId>
-        <artifactId>aws-java-sdk-kendra</artifactId>
-        <version>${aws-java-sdk-kendra.version}</version>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>kendra</artifactId>
+        <version>2.23.16-SNAPSHOT</version>
       </dependency>
       
       <dependency>
